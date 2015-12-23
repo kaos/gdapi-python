@@ -76,10 +76,10 @@ class RestObject:
     def __str__(self):
         return self.__repr__()
 
-    def _as_table(self):
-        if not hasattr(self, 'type'):
-            return str(self.__dict__)
-        data = [('Type', 'Id', 'Name', 'Value')]
+    def __table_data(self):
+        if not hasattr(self, 'type') or not hasattr(self, 'id'):
+            return
+
         for k, v in six.iteritems(self):
             if self._is_public(k, v):
                 if v is None:
@@ -91,7 +91,15 @@ class RestObject:
                 v = str(v)
                 if TRIM and len(v) > 70:
                     v = v[0:70] + '...'
-                data.append((self.type, self.id, str(k), v))
+                yield (self.type, self.id, str(k), v)
+
+    def _as_table(self):
+        data = [('Type', 'Id', 'Name', 'Value')]
+        if self._is_list():
+            for item in self:
+                data += item.__table_data()
+        else:
+            data += self.__table_data()
 
         return indent(data, hasHeader=True, prefix='| ', postfix=' |',
                       wrapfunc=lambda x: str(x))
@@ -761,11 +769,7 @@ def _run_cli(client, namespace):
                 _print_cli(client, client.by_id(type_name, args['id']))
             else:
                 result = client.list(type_name, **args)
-                if JSON:
-                    _print_cli(client, result)
-                else:
-                    for i in result:
-                        _print_cli(client, i)
+                _print_cli(client, result)
 
         if command_type == CREATE:
             _print_cli(client, client.create(type_name, **args))
